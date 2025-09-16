@@ -9,6 +9,73 @@ import (
 	"github.com/go-faster/yaml"
 )
 
+// RawType represents a JSON Schema type that can be either a single string or an array of strings.
+// This supports OpenAPI 3.1 syntax where type can be ["string", "null"] instead of nullable: true.
+// Internally always stores as a slice - single types become single-element slices.
+type RawType []string
+
+// IsEmpty returns true if no types are set.
+func (rt RawType) IsEmpty() bool {
+	return len(rt) == 0
+}
+
+// MarshalYAML implements yaml.Marshaler.
+func (rt RawType) MarshalYAML() (any, error) {
+	if len(rt) == 1 {
+		return rt[0], nil
+	}
+	return []string(rt), nil
+}
+
+// UnmarshalYAML implements yaml.Unmarshaler.
+func (rt *RawType) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		*rt = RawType{node.Value}
+		return nil
+	case yaml.SequenceNode:
+		var types []string
+		if err := node.Decode(&types); err != nil {
+			return err
+		}
+		*rt = RawType(types)
+		return nil
+	default:
+		return errors.Errorf("unexpected YAML kind %v for type field", node.Kind)
+	}
+}
+
+// MarshalJSON implements json.Marshaler.
+func (rt RawType) MarshalJSON() ([]byte, error) {
+	if len(rt) == 1 {
+		return json.Marshal(rt[0])
+	}
+	return json.Marshal([]string(rt))
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (rt *RawType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	switch tt := d.Next(); tt {
+	case jx.String:
+		val, err := d.Str()
+		if err != nil {
+			return err
+		}
+		*rt = RawType{val}
+		return nil
+	case jx.Array:
+		var types []string
+		if err := json.Unmarshal(data, &types); err != nil {
+			return err
+		}
+		*rt = RawType(types)
+		return nil
+	default:
+		return errors.Errorf("unexpected JSON type %s for type field", tt.String())
+	}
+}
+
 // RawProperty is item of RawProperties.
 type RawProperty struct {
 	Name   string

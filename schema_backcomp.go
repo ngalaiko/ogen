@@ -18,11 +18,16 @@ func (s *Schema) ToJSONSchema() *jsonschema.RawSchema {
 		return result
 	}
 
+	var rawType jsonschema.RawType
+	if s.Type != "" {
+		rawType = jsonschema.RawType{s.Type}
+	}
+
 	return &jsonschema.RawSchema{
 		Ref:                  s.Ref,
 		Summary:              s.Summary,
 		Description:          s.Description,
-		Type:                 s.Type,
+		Type:                 rawType,
 		Format:               s.Format,
 		Properties:           s.Properties.ToJSONSchema(),
 		AdditionalProperties: s.AdditionalProperties.ToJSONSchema(),

@@ -28,47 +28,47 @@ func TestInfer_Apply(t *testing.T) {
 		result RawSchema
 		inputs []string
 	}{
-		{RawSchema{Type: "integer"}, []string{"1", "2", "3"}},
-		{RawSchema{Type: "number"}, []string{"1", "2.0", "3"}},
-		{RawSchema{Type: "number"}, []string{"2.0"}},
-		{RawSchema{Type: "number", Nullable: true}, []string{"2.0", "null"}},
+		{RawSchema{Type: RawType{"integer"}}, []string{"1", "2", "3"}},
+		{RawSchema{Type: RawType{"number"}}, []string{"1", "2.0", "3"}},
+		{RawSchema{Type: RawType{"number"}}, []string{"2.0"}},
+		{RawSchema{Type: RawType{"number"}, Nullable: true}, []string{"2.0", "null"}},
 
-		{RawSchema{Type: "boolean"}, []string{"true", "false"}},
-		{RawSchema{Type: "boolean", Nullable: true}, []string{"true", "null"}},
+		{RawSchema{Type: RawType{"boolean"}}, []string{"true", "false"}},
+		{RawSchema{Type: RawType{"boolean"}, Nullable: true}, []string{"true", "null"}},
 
-		{RawSchema{Type: "array"}, []string{"[]"}},
+		{RawSchema{Type: RawType{"array"}}, []string{"[]"}},
 		{RawSchema{
-			Type: "array",
+			Type: RawType{"array"},
 			Items: &RawItems{
-				Item: &RawSchema{Type: "integer"},
+				Item: &RawSchema{Type: RawType{"integer"}},
 			},
 		}, []string{"[1]"}},
 		{RawSchema{
-			Type: "array",
+			Type: RawType{"array"},
 			Items: &RawItems{
-				Item: &RawSchema{Type: "number"},
+				Item: &RawSchema{Type: RawType{"number"}},
 			},
 		}, []string{"[1, 10, 5, 0.5]"}},
 		{RawSchema{
-			Type: "array",
+			Type: RawType{"array"},
 			Items: &RawItems{
 				Item: &RawSchema{
 					OneOf: []*RawSchema{
-						{Type: "integer"},
-						{Type: "boolean"},
-						{Type: "string"},
+						{Type: RawType{"integer"}},
+						{Type: RawType{"boolean"}},
+						{Type: RawType{"string"}},
 					},
 				},
 			},
 		}, []string{`[1, true, "foo"]`}},
 
-		{RawSchema{Type: "object", Properties: RawProperties{}}, []string{
+		{RawSchema{Type: RawType{"object"}, Properties: RawProperties{}}, []string{
 			`{}`,
 		}},
 		{RawSchema{
-			Type: "object",
+			Type: RawType{"object"},
 			Properties: RawProperties{
-				{"foo", &RawSchema{Type: "integer"}},
+				{"foo", &RawSchema{Type: RawType{"integer"}}},
 			},
 		}, []string{
 			`{}`,
@@ -77,11 +77,11 @@ func TestInfer_Apply(t *testing.T) {
 			`{"foo": 3}`,
 		}},
 		{RawSchema{
-			Type:     "object",
+			Type:     RawType{"object"},
 			Required: []string{"foo"},
 			Properties: RawProperties{
-				{"bar", &RawSchema{Type: "string"}},
-				{"foo", &RawSchema{Type: "integer"}},
+				{"bar", &RawSchema{Type: RawType{"string"}}},
+				{"foo", &RawSchema{Type: RawType{"integer"}}},
 			},
 		}, []string{
 			`{"foo": 1}`,
@@ -89,13 +89,13 @@ func TestInfer_Apply(t *testing.T) {
 			`{"foo": 2, "bar": "baz"}`,
 		}},
 		{RawSchema{
-			Type:     "object",
+			Type:     RawType{"object"},
 			Required: []string{"required", "required_nullable"},
 			Properties: RawProperties{
-				{"optional", &RawSchema{Type: "integer"}},
-				{"optional_nullable", &RawSchema{Type: "integer", Nullable: true}},
-				{"required", &RawSchema{Type: "integer"}},
-				{"required_nullable", &RawSchema{Type: "integer", Nullable: true}},
+				{"optional", &RawSchema{Type: RawType{"integer"}}},
+				{"optional_nullable", &RawSchema{Type: RawType{"integer"}, Nullable: true}},
+				{"required", &RawSchema{Type: RawType{"integer"}}},
+				{"required_nullable", &RawSchema{Type: RawType{"integer"}, Nullable: true}},
 			},
 		}, []string{
 			`{"required": 10, "required_nullable": null, "optional": 10, "optional_nullable": null}`,
@@ -106,16 +106,16 @@ func TestInfer_Apply(t *testing.T) {
 		{RawSchema{Nullable: true}, []string{"null"}},
 		{RawSchema{
 			OneOf: []*RawSchema{
-				{Type: "boolean"},
-				{Type: "string"},
-				{Type: "number"},
+				{Type: RawType{"boolean"}},
+				{Type: RawType{"string"}},
+				{Type: RawType{"number"}},
 			},
 		}, []string{"true", `"foo"`, "10", "1.0"}},
 		{RawSchema{
 			OneOf: []*RawSchema{
-				{Type: "boolean"},
-				{Type: "string"},
-				{Type: "number"},
+				{Type: RawType{"boolean"}},
+				{Type: RawType{"string"}},
+				{Type: RawType{"number"}},
 			},
 		}, []string{"true", `"foo"`, "1.0", "10"}},
 	}

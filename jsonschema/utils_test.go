@@ -15,11 +15,11 @@ func TestGetRawSchemaFields(t *testing.T) {
 	}{
 		{
 			Schema: &RawSchema{
-				Type: "object",
+				Type: RawType{"object"},
 				Properties: RawProperties{
 					RawProperty{
 						Name:   "foo",
-						Schema: &RawSchema{Type: "null"},
+						Schema: &RawSchema{Type: RawType{"null"}},
 					},
 				},
 				AdditionalProperties: &AdditionalProperties{Bool: &flse},

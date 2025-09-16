@@ -254,19 +254,21 @@ func (p *Parser) parseSchema(schema *RawSchema, ctx *jsonpointer.ResolveCtx, hoo
 		return s, nil
 	}
 
-	if schema.Type == "" && p.inferTypes {
+	if schema.Type.IsEmpty() && p.inferTypes {
 		switch {
 		case len(schema.Default) > 0:
-			schema.Type, err = inferJSONType(json.RawMessage(schema.Default))
+			t, err := inferJSONType(json.RawMessage(schema.Default))
 			if err != nil {
 				return nil, wrapField("default", err)
 			}
+			schema.Type = RawType{t}
 
 		case len(schema.Enum) > 0:
-			schema.Type, err = inferJSONType(schema.Enum[0])
+			t, err := inferJSONType(schema.Enum[0])
 			if err != nil {
 				return nil, errors.Wrap(err, "infer enum type")
 			}
+			schema.Type = RawType{t}
 		default:
 			// Try to infer schema type from properties.
 			switch {
@@ -275,45 +277,124 @@ func (p *Parser) parseSchema(schema *RawSchema, ctx *jsonpointer.ResolveCtx, hoo
 				schema.PatternProperties != nil ||
 				schema.MaxProperties != nil ||
 				schema.MinProperties != nil:
-				schema.Type = "object"
+				schema.Type = RawType{"object"}
 
 			case schema.Items != nil ||
 				schema.UniqueItems ||
 				schema.MaxItems != nil ||
 				schema.MinItems != nil:
-				schema.Type = "array"
+				schema.Type = RawType{"array"}
 
 			case schema.Maximum != nil ||
 				schema.Minimum != nil ||
 				schema.ExclusiveMinimum ||
 				schema.ExclusiveMaximum || // FIXME(tdakkota): check for existence instead of true?
 				schema.MultipleOf != nil:
-				schema.Type = "number"
+				schema.Type = RawType{"number"}
 
 			case schema.MaxLength != nil ||
 				schema.MinLength != nil ||
 				schema.Pattern != "":
-				schema.Type = "string"
+				schema.Type = RawType{"string"}
 			}
 		}
 	}
 
-	typ, ok := map[string]SchemaType{
-		"object":  Object,
-		"array":   Array,
-		"string":  String,
-		"integer": Integer,
-		"number":  Number,
-		"boolean": Boolean,
-		"null":    Null,
-		"":        Empty,
-	}[schema.Type]
-	if !ok {
-		err := errors.Errorf("unexpected schema type: %q", schema.Type)
-		return nil, wrapField("type", err)
+	// Handle type arrays by converting them to oneOf
+	types := schema.Type
+	var typ SchemaType
+	
+	if len(types) == 0 {
+		typ = Empty
+	} else if len(types) == 1 {
+		// Single type
+		singleType := types[0]
+		typeMap := map[string]SchemaType{
+			"object":  Object,
+			"array":   Array,
+			"string":  String,
+			"integer": Integer,
+			"number":  Number,
+			"boolean": Boolean,
+			"null":    Null,
+			"":        Empty,
+		}
+		var ok bool
+		typ, ok = typeMap[singleType]
+		if !ok {
+			err := errors.Errorf("unexpected schema type: %q", singleType)
+			return nil, wrapField("type", err)
+		}
+	} else {
+		// Multiple types - convert to oneOf
+		var nonNullTypes []string
+		var hasNull bool
+		
+		for _, t := range types {
+			if t == "null" {
+				hasNull = true
+			} else {
+				nonNullTypes = append(nonNullTypes, t)
+			}
+		}
+		
+		// Set nullable if null was present
+		if hasNull {
+			schema.Nullable = true
+		}
+		
+		if len(nonNullTypes) == 0 {
+			// Only null type
+			typ = Null
+		} else if len(nonNullTypes) == 1 {
+			// Single non-null type + nullable
+			singleType := nonNullTypes[0]
+			typeMap := map[string]SchemaType{
+				"object":  Object,
+				"array":   Array,
+				"string":  String,
+				"integer": Integer,
+				"number":  Number,
+				"boolean": Boolean,
+			}
+			var ok bool
+			typ, ok = typeMap[singleType]
+			if !ok {
+				err := errors.Errorf("unexpected schema type: %q", singleType)
+				return nil, wrapField("type", err)
+			}
+			// Update schema.Type to be single type
+			schema.Type = RawType{singleType}
+		} else {
+			// Multiple non-null types - convert to oneOf
+			oneOfSchemas := make([]*RawSchema, 0, len(nonNullTypes))
+			
+			for _, t := range nonNullTypes {
+				// Validate each type
+				validTypes := map[string]bool{
+					"object": true, "array": true, "string": true,
+					"integer": true, "number": true, "boolean": true,
+				}
+				if !validTypes[t] {
+					err := errors.Errorf("unexpected schema type in array: %q", t)
+					return nil, wrapField("type", err)
+				}
+				
+				oneOfSchemas = append(oneOfSchemas, &RawSchema{
+					Type: RawType{t},
+				})
+			}
+			
+			// Set oneOf and clear type
+			schema.OneOf = oneOfSchemas
+			schema.Type = RawType{}
+			typ = Empty
+		}
 	}
 
-	if schema.Type != "" {
+	// At this point, schema.Type is either empty or contains a single type.
+	// Type arrays have been converted to oneOf above.
+	if len(schema.Type) == 1 {
 		allowed := map[string]map[string]struct{}{
 			"object": {
 				"required":          {},
@@ -363,7 +444,8 @@ func (p *Parser) parseSchema(schema *RawSchema, ctx *jsonpointer.ResolveCtx, hoo
 			}
 		}
 
-		if allowedFields, ok := allowed[schema.Type]; ok {
+		// schema.Type is guaranteed to have exactly 1 element here due to the check above
+		if allowedFields, ok := allowed[schema.Type[0]]; ok {
 			fields, err := getRawSchemaFields(schema)
 			if err != nil {
 				return nil, err
@@ -376,7 +458,7 @@ func (p *Parser) parseSchema(schema *RawSchema, ctx *jsonpointer.ResolveCtx, hoo
 				}
 
 				if _, ok := allowedFields[field]; !ok {
-					return nil, wrapField(field, errors.Errorf("unexpected field for type %q", schema.Type))
+					return nil, wrapField(field, errors.Errorf("unexpected field for type %q", schema.Type[0]))
 				}
 			}
 		}

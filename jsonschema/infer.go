@@ -28,12 +28,12 @@ func applyType(s *RawSchema, tt string) {
 		return
 	}
 	if len(s.OneOf) > 0 {
-		s.OneOf = append(s.OneOf, &RawSchema{Type: tt})
+		s.OneOf = append(s.OneOf, &RawSchema{Type: RawType{tt}})
 		return
 	}
 
-	if s.Type == "" {
-		s.Type = tt
+	if s.Type.IsEmpty() {
+		s.Type = RawType{tt}
 		return
 	}
 
@@ -41,32 +41,55 @@ func applyType(s *RawSchema, tt string) {
 	*s = RawSchema{
 		OneOf: []*RawSchema{
 			&old,
-			{Type: tt},
+			{Type: RawType{tt}},
 		},
 	}
 }
 
 func hasType(s *RawSchema, tt string) bool {
-	if s.Type == tt {
-		return true
+	for _, t := range s.Type {
+		if t == tt {
+			return true
+		}
 	}
 	for _, v := range s.OneOf {
-		if v.Type == tt {
-			return true
+		for _, t := range v.Type {
+			if t == tt {
+				return true
+			}
 		}
 	}
 	return false
 }
 
 func replaceType(s *RawSchema, from, to string) bool {
-	if s.Type == from {
-		s.Type = to
-		return true
-	}
-	for _, v := range s.OneOf {
-		if v.Type == from {
-			v.Type = to
+	for i, t := range s.Type {
+		if t == from {
+			if len(s.Type) == 1 {
+				s.Type = RawType{to}
+			} else {
+				newTypes := make([]string, len(s.Type))
+				copy(newTypes, s.Type)
+				newTypes[i] = to
+				s.Type = RawType(newTypes)
+			}
 			return true
+		}
+	}
+	
+	for _, v := range s.OneOf {
+		for i, t := range v.Type {
+			if t == from {
+				if len(v.Type) == 1 {
+					v.Type = RawType{to}
+				} else {
+					newTypes := make([]string, len(v.Type))
+					copy(newTypes, v.Type)
+					newTypes[i] = to
+					v.Type = RawType(newTypes)
+				}
+				return true
+			}
 		}
 	}
 	return false

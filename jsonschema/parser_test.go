@@ -40,15 +40,15 @@ func TestSchemaSimple(t *testing.T) {
 	parser := NewParser(Settings{})
 
 	out, err := parser.Parse(&RawSchema{
-		Type: "object",
+		Type: RawType{"object"},
 		Properties: []RawProperty{
 			{
 				Name:   "id",
-				Schema: &RawSchema{Type: "integer"},
+				Schema: &RawSchema{Type: RawType{"integer"}},
 			},
 			{
 				Name:   "name",
-				Schema: &RawSchema{Type: "string"},
+				Schema: &RawSchema{Type: RawType{"string"}},
 			},
 		},
 		Required: []string{"id", "name"},
@@ -78,20 +78,20 @@ func TestSchemaSimple(t *testing.T) {
 func TestSchemaRecursive(t *testing.T) {
 	components := components{
 		"Pet": {
-			Type: "object",
+			Type: RawType{"object"},
 			Properties: []RawProperty{
 				{
 					Name:   "id",
-					Schema: &RawSchema{Type: "integer"},
+					Schema: &RawSchema{Type: RawType{"integer"}},
 				},
 				{
 					Name:   "name",
-					Schema: &RawSchema{Type: "string"},
+					Schema: &RawSchema{Type: RawType{"string"}},
 				},
 				{
 					Name: "friends",
 					Schema: &RawSchema{
-						Type: "array",
+						Type: RawType{"array"},
 						Items: &RawItems{
 							Item: &RawSchema{
 								Ref: "#/components/schemas/Pet",
@@ -173,7 +173,7 @@ func TestSchemaRecursive(t *testing.T) {
 func TestSchemaInfiniteRecursion(t *testing.T) {
 	testCases := []RawSchema{
 		{
-			Type: "object",
+			Type: RawType{"object"},
 			Ref:  "#/components/schemas/Type",
 		},
 	}
@@ -207,10 +207,10 @@ func TestSchemaRefToRef(t *testing.T) {
 			Ref: "#/components/schemas/actual",
 		},
 		"actual": {
-			Type: "integer",
+			Type: RawType{"integer"},
 		},
 		"referer": {
-			Type: "object",
+			Type: RawType{"object"},
 			Properties: RawProperties{
 				{"Ref1", &RawSchema{Ref: "#/components/schemas/first"}},
 				{"Ref2", &RawSchema{Ref: "#/components/schemas/first"}},
@@ -272,28 +272,28 @@ func TestSchemaSideEffects(t *testing.T) {
 	parser := NewParser(Settings{})
 
 	out, err := parser.Parse(&RawSchema{
-		Type: "object",
+		Type: RawType{"object"},
 		Properties: []RawProperty{
 			{
 				Name:   "name",
-				Schema: &RawSchema{Type: "string"},
+				Schema: &RawSchema{Type: RawType{"string"}},
 			},
 			{
 				Name: "owner",
 				Schema: &RawSchema{
-					Type: "object",
+					Type: RawType{"object"},
 					Properties: []RawProperty{
 						{
 							Name:   "name",
-							Schema: &RawSchema{Type: "string"},
+							Schema: &RawSchema{Type: RawType{"string"}},
 						},
 						{
 							Name:   "age",
-							Schema: &RawSchema{Type: "integer"},
+							Schema: &RawSchema{Type: RawType{"integer"}},
 						},
 						{
 							Name:   "id",
-							Schema: &RawSchema{Type: "integer"},
+							Schema: &RawSchema{Type: RawType{"integer"}},
 						},
 					},
 					Required: []string{"name", "id", "age"},
@@ -310,10 +310,10 @@ func TestSchemaSideEffects(t *testing.T) {
 func TestSchemaReferencedArray(t *testing.T) {
 	components := components{
 		"Pets": {
-			Type: "array",
+			Type: RawType{"array"},
 			Items: &RawItems{
 				Item: &RawSchema{
-					Type: "string",
+					Type: RawType{"string"},
 				},
 			},
 		},
@@ -346,7 +346,7 @@ func TestSchemaReferencedArray(t *testing.T) {
 	})
 
 	out, err := parser.Parse(&RawSchema{
-		Type: "object",
+		Type: RawType{"object"},
 		Properties: []RawProperty{
 			{
 				Name: "pets",
@@ -437,14 +437,14 @@ func TestInvalidMultipleOf(t *testing.T) {
 		t.Run(typ, func(t *testing.T) {
 			for _, v := range values {
 				_, err := parser.Parse(&RawSchema{
-					Type:       typ,
+					Type:       RawType{typ},
 					MultipleOf: strconv.AppendInt(nil, int64(v), 10),
 				}, testCtx())
 				require.Errorf(t, err, "%d", v)
 			}
 		})
 		_, err := parser.Parse(&RawSchema{
-			Type:       typ,
+			Type:       RawType{typ},
 			MultipleOf: []byte("true"),
 		}, testCtx())
 		require.Error(t, err)
